@@ -518,10 +518,6 @@
             grid.appendChild(cell);
           });
           container.appendChild(grid);
-          const firstSelectable = grid.querySelector('.selectable');
-          if (firstSelectable) {
-            selectElement(firstSelectable);
-          }
           if (urls.length > urlsToRender.length) {
             const note = document.createElement('p');
             note.className = 'grid-note';
@@ -569,10 +565,6 @@
             strip.appendChild(card);
           });
           container.appendChild(strip);
-          const firstSelectable = strip.querySelector('.selectable');
-          if (firstSelectable) {
-            selectElement(firstSelectable);
-          }
         }
       }
 
