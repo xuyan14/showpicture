@@ -21,7 +21,27 @@
         min-height: 100vh;
       }
 
-      header {
+      .app-shell {
+        flex: 1;
+        display: grid;
+        grid-template-columns: 260px 1fr;
+        gap: 24px;
+      }
+
+      .sidebar {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+
+      .sidebar-title {
+        margin: 0;
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: #333;
+      }
+
+      .footer-controls {
         display: flex;
         flex-direction: column;
         gap: 16px;
@@ -74,19 +94,27 @@
       }
 
       .category-toggle {
-        display: inline-flex;
-        flex-wrap: wrap;
+        display: flex;
+        flex-direction: column;
         gap: 8px;
+        padding: 16px;
+        border-radius: 16px;
+        background: rgba(255, 255, 255, 0.7);
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+        overflow-y: auto;
+        max-height: calc(100vh - 220px);
       }
 
       .category-button {
-        padding: 8px 14px;
+        padding: 10px 14px;
         font-size: 0.95rem;
         border-radius: 999px;
         border: 1px solid rgba(0, 0, 0, 0.18);
         background: #fff;
         cursor: pointer;
         transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+        text-align: left;
+        width: 100%;
       }
 
       .category-button:hover:not([aria-pressed='true']) {
@@ -252,6 +280,31 @@
           padding: 16px;
         }
 
+        .app-shell {
+          grid-template-columns: 1fr;
+          gap: 16px;
+        }
+
+        .sidebar {
+          gap: 12px;
+        }
+
+        .category-toggle {
+          width: 100%;
+          flex-direction: row;
+          flex-wrap: wrap;
+          max-height: none;
+          padding: 12px;
+        }
+
+        .category-button {
+          width: auto;
+        }
+
+        .footer-controls {
+          gap: 12px;
+        }
+
         .top-bar {
           flex-direction: column;
           align-items: flex-start;
@@ -260,10 +313,6 @@
         .nav {
           width: 100%;
           justify-content: space-between;
-        }
-
-        .category-toggle {
-          width: 100%;
         }
 
         .image-strip {
@@ -297,7 +346,18 @@
     </style>
   </head>
   <body>
-    <header>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <h2 class="sidebar-title">素材类别</h2>
+        <div class="category-toggle" id="category-toggle" role="tablist" aria-label="素材类别切换"></div>
+      </aside>
+      <main>
+        <section class="meta" id="meta"></section>
+        <section id="preview"></section>
+        <div class="empty-state" id="empty-state" hidden>暂无素材组数据</div>
+      </main>
+    </div>
+    <footer class="footer-controls">
       <div class="top-bar">
         <h1>素材组图片预览</h1>
         <div class="nav">
@@ -306,12 +366,7 @@
           <button id="next-btn" type="button">下一组</button>
         </div>
       </div>
-      <div class="category-toggle" id="category-toggle" role="tablist" aria-label="素材类别切换"></div>
-    </header>
-    <main>
-      <section class="meta" id="meta"></section>
-      <section id="preview"></section>
-    </main>
+    </footer>
     <template id="meta-template">
       <div>素材组ID：<strong data-field="unique_material_id"></strong></div>
       <div>报表日期：<strong data-field="report_date"></strong></div>
@@ -330,7 +385,6 @@
     <template id="grid-cell-template">
       <div class="grid-cell" role="listitem"></div>
     </template>
-    <div class="empty-state" id="empty-state" hidden>暂无素材组数据</div>
     <script>
       const state = {
         categories: [],
