@@ -147,6 +147,8 @@
         padding: 12px;
         gap: 6px;
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        cursor: pointer;
       }
 
       .image-wrapper {
@@ -194,6 +196,8 @@
         aspect-ratio: 1 / 1;
         gap: 6px;
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        cursor: pointer;
       }
 
       .grid-cell .image-wrapper {
@@ -206,6 +210,12 @@
         object-fit: contain;
         border-radius: 10px;
         background: linear-gradient(135deg, #f0f0f0, #fafafa);
+      }
+
+      .image-card.is-selected,
+      .grid-cell.is-selected {
+        border-color: #f4c430;
+        box-shadow: 0 0 0 3px rgba(244, 196, 48, 0.35);
       }
 
       .grid-note {
@@ -332,6 +342,14 @@
       const prevBtn = document.querySelector('#prev-btn');
       const nextBtn = document.querySelector('#next-btn');
 
+      function truncateText(input, maxLength = 20) {
+        const text = (input || '').trim();
+        if (!text) {
+          return '';
+        }
+        return text.length > maxLength ? `${text.slice(0, maxLength)}…` : text;
+      }
+
       async function loadData() {
         const response = await fetch('./data.json', { cache: 'no-store' });
         if (!response.ok) {
@@ -386,7 +404,7 @@
 
       function renderMeta(record, category) {
         const meta = document.querySelector('#meta');
-      const template = document.querySelector('#meta-template');
+        const template = document.querySelector('#meta-template');
         meta.replaceChildren();
         if (!record) {
           return;
@@ -450,6 +468,14 @@
 
         const titles = Array.isArray(record.material_titles) ? record.material_titles : [];
 
+        const selectElement = (element) => {
+          if (!element) {
+            return;
+          }
+          container.querySelectorAll('.selectable').forEach((item) => item.classList.remove('is-selected'));
+          element.classList.add('is-selected');
+        };
+
         if (layout === 'grid') {
           const gridTemplate = document.querySelector('#image-grid-template');
           const cellTemplate = document.querySelector('#grid-cell-template');
@@ -457,6 +483,8 @@
           const urlsToRender = urls.slice(0, 9);
           urlsToRender.forEach((url, index) => {
             const cell = cellTemplate.content.cloneNode(true).firstElementChild;
+            cell.classList.add('selectable');
+            cell.tabIndex = 0;
             const img = document.createElement('img');
             img.src = url;
             img.alt = `${record.unique_material_id || '素材组'} - 图片 ${index + 1}`;
@@ -466,17 +494,34 @@
             wrapper.appendChild(img);
             cell.appendChild(wrapper);
 
-            const title = titles[index] || '';
+            const rawTitle = titles[index] || '';
+            const fallbackTitle = `图片 ${index + 1}`;
+            const displayTitle = truncateText(rawTitle, 20) || fallbackTitle;
             const caption = document.createElement('a');
             caption.href = url;
             caption.target = '_blank';
             caption.rel = 'noopener noreferrer';
             caption.className = 'image-caption';
-            caption.textContent = title || `图片 ${index + 1}`;
+            caption.textContent = displayTitle;
+            caption.setAttribute('aria-label', rawTitle || fallbackTitle);
+            caption.title = rawTitle || fallbackTitle;
             cell.appendChild(caption);
+
+            const handleSelect = () => selectElement(cell);
+            cell.addEventListener('click', handleSelect);
+            cell.addEventListener('keydown', (event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                handleSelect();
+              }
+            });
             grid.appendChild(cell);
           });
           container.appendChild(grid);
+          const firstSelectable = grid.querySelector('.selectable');
+          if (firstSelectable) {
+            selectElement(firstSelectable);
+          }
           if (urls.length > urlsToRender.length) {
             const note = document.createElement('p');
             note.className = 'grid-note';
@@ -489,6 +534,8 @@
           const strip = stripTemplate.content.cloneNode(true).firstElementChild;
           urls.forEach((url, index) => {
             const card = cardTemplate.content.cloneNode(true).firstElementChild;
+            card.classList.add('selectable');
+            card.tabIndex = 0;
             const img = document.createElement('img');
             img.src = url;
             img.alt = `${record.unique_material_id || '素材组'} - 图片 ${index + 1}`;
@@ -498,17 +545,34 @@
             wrapper.appendChild(img);
             card.appendChild(wrapper);
 
-            const title = titles[index] || '';
+            const rawTitle = titles[index] || '';
+            const fallbackTitle = `图片 ${index + 1}`;
+            const displayTitle = truncateText(rawTitle, 20) || fallbackTitle;
             const caption = document.createElement('a');
             caption.href = url;
             caption.target = '_blank';
             caption.rel = 'noopener noreferrer';
             caption.className = 'image-caption';
-            caption.textContent = title || `图片 ${index + 1}`;
+            caption.textContent = displayTitle;
+            caption.setAttribute('aria-label', rawTitle || fallbackTitle);
+            caption.title = rawTitle || fallbackTitle;
             card.appendChild(caption);
+
+            const handleSelect = () => selectElement(card);
+            card.addEventListener('click', handleSelect);
+            card.addEventListener('keydown', (event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                handleSelect();
+              }
+            });
             strip.appendChild(card);
           });
           container.appendChild(strip);
+          const firstSelectable = strip.querySelector('.selectable');
+          if (firstSelectable) {
+            selectElement(firstSelectable);
+          }
         }
       }
 
