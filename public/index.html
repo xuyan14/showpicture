@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>素材组预览</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background-color: #f5f5f5;
+        color: #222;
+      }
+
+      body {
+        margin: 0;
+        padding: 24px;
+        display: flex;
+        flex-direction: column;
+        gap: 24px;
+        min-height: 100vh;
+      }
+
+      header {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+
+      .top-bar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 16px;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 1.8rem;
+      }
+
+      .nav {
+        display: inline-flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .nav button {
+        padding: 10px 16px;
+        font-size: 1rem;
+        border-radius: 999px;
+        border: 1px solid rgba(0, 0, 0, 0.15);
+        background: linear-gradient(135deg, #ffffff, #f0f0f0);
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+        cursor: pointer;
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
+      }
+
+      .nav button:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      }
+
+      .nav button:disabled {
+        cursor: not-allowed;
+        opacity: 0.6;
+        transform: none;
+        box-shadow: none;
+      }
+
+      .nav span {
+        font-weight: 600;
+      }
+
+      .category-toggle {
+        display: inline-flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .category-button {
+        padding: 8px 14px;
+        font-size: 0.95rem;
+        border-radius: 999px;
+        border: 1px solid rgba(0, 0, 0, 0.18);
+        background: #fff;
+        cursor: pointer;
+        transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+      }
+
+      .category-button:hover:not([aria-pressed='true']) {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+      }
+
+      .category-button[aria-pressed='true'] {
+        background: linear-gradient(135deg, #4f8bfd, #6dbbff);
+        color: #fff;
+        border-color: transparent;
+        box-shadow: 0 6px 16px rgba(79, 139, 253, 0.4);
+      }
+
+      main {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+
+      .meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 16px;
+        font-size: 0.95rem;
+        color: #555;
+      }
+
+      .meta [data-field='cost'] {
+        color: #2f5f2f;
+        font-weight: 600;
+      }
+
+      .meta [data-field='cost'] strong {
+        font-size: 1.05rem;
+        margin-left: 4px;
+      }
+
+      .image-strip {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 12px;
+        padding: 8px 0 16px;
+      }
+
+      .image-card {
+        flex: 0 1 200px;
+        max-width: 200px;
+        border-radius: 14px;
+        border: 1px solid rgba(0, 0, 0, 0.08);
+        background: #fff;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: flex-start;
+        padding: 12px;
+        gap: 6px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+      }
+
+      .image-wrapper {
+        width: 100%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+
+      .image-card img {
+        display: block;
+        width: 100%;
+        height: 100%;
+        max-height: 280px;
+        object-fit: contain;
+        border-radius: 10px;
+        background: linear-gradient(135deg, #f0f0f0, #fafafa);
+      }
+
+      .image-caption {
+        font-size: 0.7rem;
+        color: #4a4a4a;
+        text-decoration: underline;
+        text-align: center;
+        word-break: break-all;
+      }
+
+      .image-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+        width: min(720px, 100%);
+        margin: 0 auto 16px;
+      }
+
+      .grid-cell {
+        border-radius: 14px;
+        border: 1px solid rgba(0, 0, 0, 0.08);
+        background: #fff;
+        padding: 12px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: flex-start;
+        aspect-ratio: 1 / 1;
+        gap: 6px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+      }
+
+      .grid-cell .image-wrapper {
+        flex: 1 1 auto;
+      }
+
+      .grid-cell img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        border-radius: 10px;
+        background: linear-gradient(135deg, #f0f0f0, #fafafa);
+      }
+
+      .grid-note {
+        text-align: center;
+        font-size: 0.85rem;
+        color: #666;
+        margin-top: -8px;
+      }
+
+      .image-strip::-webkit-scrollbar {
+        height: 10px;
+      }
+
+      .image-strip::-webkit-scrollbar-thumb {
+        background-color: rgba(0, 0, 0, 0.25);
+        border-radius: 999px;
+      }
+
+      .image-strip::-webkit-scrollbar-track {
+        background-color: transparent;
+      }
+
+      .empty-state {
+        padding: 64px 24px;
+        text-align: center;
+        color: #777;
+        border: 1px dashed #ccc;
+        border-radius: 12px;
+        background-color: rgba(0, 0, 0, 0.02);
+      }
+
+      @media (max-width: 768px) {
+        body {
+          padding: 16px;
+        }
+
+        .top-bar {
+          flex-direction: column;
+          align-items: flex-start;
+        }
+
+        .nav {
+          width: 100%;
+          justify-content: space-between;
+        }
+
+        .category-toggle {
+          width: 100%;
+        }
+
+        .image-strip {
+          align-items: center;
+        }
+
+        .image-card {
+          flex-basis: 140px;
+          max-width: 140px;
+          padding: 10px;
+          gap: 4px;
+        }
+
+        .image-card img {
+          max-height: 220px;
+        }
+
+        .image-grid {
+          width: 100%;
+        }
+
+        .grid-cell {
+          padding: 10px;
+          gap: 4px;
+        }
+
+        .image-caption {
+          font-size: 0.65rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="top-bar">
+        <h1>素材组图片预览</h1>
+        <div class="nav">
+          <button id="prev-btn" type="button">上一组</button>
+          <span id="nav-indicator">0 / 0</span>
+          <button id="next-btn" type="button">下一组</button>
+        </div>
+      </div>
+      <div class="category-toggle" id="category-toggle" role="tablist" aria-label="素材类别切换"></div>
+    </header>
+    <main>
+      <section class="meta" id="meta"></section>
+      <section id="preview"></section>
+    </main>
+    <template id="meta-template">
+      <div>素材组ID：<strong data-field="unique_material_id"></strong></div>
+      <div>报表日期：<strong data-field="report_date"></strong></div>
+      <div data-field="cost"><span data-field="cost-label">成本</span>：<strong></strong></div>
+      <div data-field="title"></div>
+    </template>
+    <template id="image-strip-template">
+      <div class="image-strip" role="list"></div>
+    </template>
+    <template id="image-card-template">
+      <div class="image-card" role="listitem"></div>
+    </template>
+    <template id="image-grid-template">
+      <div class="image-grid" role="list"></div>
+    </template>
+    <template id="grid-cell-template">
+      <div class="grid-cell" role="listitem"></div>
+    </template>
+    <div class="empty-state" id="empty-state" hidden>暂无素材组数据</div>
+    <script>
+      const state = {
+        categories: [],
+        categoryLookup: new Map(),
+        indices: new Map(),
+        currentId: '',
+      };
+
+      const prevBtn = document.querySelector('#prev-btn');
+      const nextBtn = document.querySelector('#next-btn');
+
+      async function loadData() {
+        const response = await fetch('./data.json', { cache: 'no-store' });
+        if (!response.ok) {
+          throw new Error('无法加载素材数据');
+        }
+        return response.json();
+      }
+
+      function initializeState(categories) {
+        state.categories = categories;
+        state.categoryLookup = new Map(categories.map((category) => [category.id, category]));
+        state.indices = new Map();
+        categories.forEach((category) => {
+          state.indices.set(category.id, 0);
+        });
+        state.currentId = categories[0]?.id || '';
+      }
+
+      function getCurrentCategory() {
+        return state.categoryLookup.get(state.currentId) || null;
+      }
+
+      function getCurrentIndex() {
+        const category = getCurrentCategory();
+        if (!category || !Array.isArray(category.items) || category.items.length === 0) {
+          return 0;
+        }
+        const total = category.items.length;
+        let index = state.indices.get(category.id) ?? 0;
+        if (!Number.isInteger(index)) {
+          index = 0;
+        }
+        index = ((index % total) + total) % total;
+        state.indices.set(category.id, index);
+        return index;
+      }
+
+      function setCurrentIndex(nextIndex) {
+        const category = getCurrentCategory();
+        if (!category || !Array.isArray(category.items) || category.items.length === 0) {
+          return;
+        }
+        const total = category.items.length;
+        const normalized = ((nextIndex % total) + total) % total;
+        state.indices.set(category.id, normalized);
+      }
+
+      function setNavDisabled(disabled) {
+        prevBtn.disabled = disabled;
+        nextBtn.disabled = disabled;
+      }
+
+      function renderMeta(record, category) {
+        const meta = document.querySelector('#meta');
+      const template = document.querySelector('#meta-template');
+        meta.replaceChildren();
+        if (!record) {
+          return;
+        }
+        const fragment = template.content.cloneNode(true);
+        fragment.querySelector('[data-field=\"unique_material_id\"]').textContent =
+          record.unique_material_id || '无';
+        fragment.querySelector('[data-field=\"report_date\"]').textContent =
+          record.report_date || '无';
+
+        const costWrapper = fragment.querySelector('[data-field=\"cost\"]');
+        if (costWrapper) {
+          const costValue = record.cost == null ? '' : String(record.cost).trim();
+          const costLabel = costWrapper.querySelector('[data-field=\"cost-label\"]');
+          const costContent = costWrapper.querySelector('strong');
+          if (costValue && costValue.toUpperCase() !== '(NULL)') {
+            costContent.textContent = costValue;
+            costLabel.textContent = 'cost';
+          } else {
+            costWrapper.remove();
+          }
+        }
+
+        const titleField = fragment.querySelector('[data-field=\"title\"]');
+        const titles = Array.isArray(record.material_titles) ? record.material_titles : [];
+        const uniqueTitles = [];
+        const seen = new Set();
+        titles.forEach((title) => {
+          if (!title) {
+            return;
+          }
+          const key = title.trim();
+          if (!key || seen.has(key)) {
+            return;
+          }
+          seen.add(key);
+          uniqueTitles.push(key);
+        });
+        titleField.textContent = uniqueTitles.length ? `标题：${uniqueTitles.join(' / ')}` : '';
+        if (!titleField.textContent) {
+          titleField.remove();
+        }
+
+        meta.appendChild(fragment);
+        meta.dataset.category = category?.id || '';
+      }
+
+      function renderImages(record, layout) {
+        const container = document.querySelector('#preview');
+        const empty = document.querySelector('#empty-state');
+        container.replaceChildren();
+        container.dataset.layout = layout || 'strip';
+
+        const urls = Array.isArray(record?.material_urls) ? record.material_urls : [];
+        if (!record || urls.length === 0) {
+          empty.hidden = false;
+          empty.textContent = '当前素材组暂无图片';
+          return;
+        }
+        empty.hidden = true;
+
+        const titles = Array.isArray(record.material_titles) ? record.material_titles : [];
+
+        if (layout === 'grid') {
+          const gridTemplate = document.querySelector('#image-grid-template');
+          const cellTemplate = document.querySelector('#grid-cell-template');
+          const grid = gridTemplate.content.cloneNode(true).firstElementChild;
+          const urlsToRender = urls.slice(0, 9);
+          urlsToRender.forEach((url, index) => {
+            const cell = cellTemplate.content.cloneNode(true).firstElementChild;
+            const img = document.createElement('img');
+            img.src = url;
+            img.alt = `${record.unique_material_id || '素材组'} - 图片 ${index + 1}`;
+            img.loading = 'lazy';
+            const wrapper = document.createElement('div');
+            wrapper.className = 'image-wrapper';
+            wrapper.appendChild(img);
+            cell.appendChild(wrapper);
+
+            const title = titles[index] || '';
+            const caption = document.createElement('a');
+            caption.href = url;
+            caption.target = '_blank';
+            caption.rel = 'noopener noreferrer';
+            caption.className = 'image-caption';
+            caption.textContent = title || `图片 ${index + 1}`;
+            cell.appendChild(caption);
+            grid.appendChild(cell);
+          });
+          container.appendChild(grid);
+          if (urls.length > urlsToRender.length) {
+            const note = document.createElement('p');
+            note.className = 'grid-note';
+            note.textContent = `仅展示前 9 张，共 ${urls.length} 张图片`;
+            container.appendChild(note);
+          }
+        } else {
+          const stripTemplate = document.querySelector('#image-strip-template');
+          const cardTemplate = document.querySelector('#image-card-template');
+          const strip = stripTemplate.content.cloneNode(true).firstElementChild;
+          urls.forEach((url, index) => {
+            const card = cardTemplate.content.cloneNode(true).firstElementChild;
+            const img = document.createElement('img');
+            img.src = url;
+            img.alt = `${record.unique_material_id || '素材组'} - 图片 ${index + 1}`;
+            img.loading = 'lazy';
+            const wrapper = document.createElement('div');
+            wrapper.className = 'image-wrapper';
+            wrapper.appendChild(img);
+            card.appendChild(wrapper);
+
+            const title = titles[index] || '';
+            const caption = document.createElement('a');
+            caption.href = url;
+            caption.target = '_blank';
+            caption.rel = 'noopener noreferrer';
+            caption.className = 'image-caption';
+            caption.textContent = title || `图片 ${index + 1}`;
+            card.appendChild(caption);
+            strip.appendChild(card);
+          });
+          container.appendChild(strip);
+        }
+      }
+
+      function updateIndicator(currentIndex, total, category) {
+        const indicator = document.querySelector('#nav-indicator');
+        if (!category) {
+          indicator.textContent = '0 / 0';
+          return;
+        }
+        const displayIndex = total === 0 ? 0 : currentIndex + 1;
+        indicator.textContent = `${category.name} · ${displayIndex} / ${total}`;
+      }
+
+      function updateCategoryButtons() {
+        const toggle = document.querySelector('#category-toggle');
+        if (!toggle) {
+          return;
+        }
+        toggle.querySelectorAll('.category-button').forEach((button) => {
+          const isActive = button.dataset.categoryId === state.currentId;
+          button.setAttribute('aria-pressed', String(isActive));
+          button.setAttribute('aria-selected', String(isActive));
+          button.classList.toggle('is-active', isActive);
+        });
+      }
+
+      function renderCategoryToggle() {
+        const toggle = document.querySelector('#category-toggle');
+        toggle.replaceChildren();
+        state.categories.forEach((category) => {
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.className = 'category-button';
+          button.dataset.categoryId = category.id;
+          button.setAttribute('role', 'tab');
+          button.textContent = `${category.name}（${category.items.length}）`;
+          button.addEventListener('click', () => {
+            switchCategory(category.id);
+          });
+          toggle.appendChild(button);
+        });
+        updateCategoryButtons();
+      }
+
+      function switchCategory(categoryId) {
+        if (!state.categoryLookup.has(categoryId)) {
+          return;
+        }
+        state.currentId = categoryId;
+        if (!state.indices.has(categoryId)) {
+          state.indices.set(categoryId, 0);
+        }
+        showCurrent();
+      }
+
+      function step(delta) {
+        const category = getCurrentCategory();
+        if (!category || !Array.isArray(category.items) || category.items.length === 0) {
+          return;
+        }
+        const currentIndex = getCurrentIndex();
+        setCurrentIndex(currentIndex + delta);
+        showCurrent();
+      }
+
+      function attachNavHandlers() {
+        prevBtn.addEventListener('click', () => step(-1));
+        nextBtn.addEventListener('click', () => step(1));
+        window.addEventListener('keydown', (event) => {
+          if (event.key === 'ArrowLeft') {
+            event.preventDefault();
+            step(-1);
+          } else if (event.key === 'ArrowRight') {
+            event.preventDefault();
+            step(1);
+          }
+        });
+      }
+
+      function showCurrent() {
+        updateCategoryButtons();
+        const category = getCurrentCategory();
+        const empty = document.querySelector('#empty-state');
+        if (!category) {
+          document.querySelector('#meta').replaceChildren();
+          document.querySelector('#preview').replaceChildren();
+          empty.hidden = false;
+          empty.textContent = '暂无素材组数据';
+          updateIndicator(0, 0, null);
+          setNavDisabled(true);
+          return;
+        }
+
+        const total = Array.isArray(category.items) ? category.items.length : 0;
+        if (total === 0) {
+          document.querySelector('#meta').replaceChildren();
+          document.querySelector('#preview').replaceChildren();
+          empty.hidden = false;
+          empty.textContent = '当前类别暂无素材数据';
+          updateIndicator(0, 0, category);
+          setNavDisabled(true);
+          return;
+        }
+
+        const currentIndex = getCurrentIndex();
+        const record = category.items[currentIndex];
+        renderMeta(record, category);
+        renderImages(record, category.layout);
+        updateIndicator(currentIndex, total, category);
+        setNavDisabled(total <= 1);
+      }
+
+      async function bootstrap() {
+        try {
+          const payload = await loadData();
+          const categories = Array.isArray(payload?.categories)
+            ? payload.categories.filter(
+                (category) => category && Array.isArray(category.items),
+              )
+            : [];
+
+          if (categories.length === 0) {
+            const empty = document.querySelector('#empty-state');
+            empty.hidden = false;
+            empty.textContent = '暂无素材组数据';
+            setNavDisabled(true);
+            return;
+          }
+
+          initializeState(categories);
+          renderCategoryToggle();
+          attachNavHandlers();
+          switchCategory(state.currentId);
+        } catch (error) {
+          console.error(error);
+          const empty = document.querySelector('#empty-state');
+          empty.textContent = error.message;
+          empty.hidden = false;
+          setNavDisabled(true);
+        }
+      }
+
+      bootstrap();
+    </script>
+  </body>
+</html>
+
+
