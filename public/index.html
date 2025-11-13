@@ -41,6 +41,13 @@
         color: #333;
       }
 
+      .sidebar-subtitle {
+        margin: 8px 0 0;
+        font-size: 0.95rem;
+        font-weight: 500;
+        color: #555;
+      }
+
       .footer-controls {
         display: flex;
         flex-direction: column;
@@ -127,6 +134,47 @@
         color: #fff;
         border-color: transparent;
         box-shadow: 0 6px 16px rgba(79, 139, 253, 0.4);
+      }
+
+      .group-list {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        padding: 16px;
+        border-radius: 16px;
+        background: rgba(255, 255, 255, 0.7);
+        box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.03);
+        overflow-y: auto;
+        max-height: calc(100vh - 360px);
+      }
+
+      .group-item {
+        padding: 8px 12px;
+        border-radius: 12px;
+        border: 1px solid rgba(0, 0, 0, 0.12);
+        background: #fff;
+        cursor: pointer;
+        text-align: left;
+        font-size: 0.9rem;
+        color: #333;
+        transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+      }
+
+      .group-item:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+      }
+
+      .group-item.is-active {
+        border-color: #4f8bfd;
+        box-shadow: 0 0 0 2px rgba(79, 139, 253, 0.25);
+        background: linear-gradient(135deg, rgba(79, 139, 253, 0.1), rgba(109, 187, 255, 0.08));
+      }
+
+      .group-list-empty {
+        color: #777;
+        font-size: 0.9rem;
+        text-align: center;
       }
 
       main {
@@ -301,6 +349,18 @@
           width: auto;
         }
 
+        .group-list {
+          max-height: none;
+          padding: 12px;
+          flex-direction: row;
+          flex-wrap: wrap;
+          gap: 10px;
+        }
+
+        .group-item {
+          width: auto;
+        }
+
         .footer-controls {
           gap: 12px;
         }
@@ -350,10 +410,12 @@
       <aside class="sidebar">
         <h2 class="sidebar-title">素材类别</h2>
         <div class="category-toggle" id="category-toggle" role="tablist" aria-label="素材类别切换"></div>
+        <h3 class="sidebar-subtitle">素材组列表</h3>
+        <div class="group-list" id="group-list" role="listbox" aria-label="素材组列表"></div>
       </aside>
       <main>
-        <section class="meta" id="meta"></section>
         <section id="preview"></section>
+        <section class="meta" id="meta"></section>
         <div class="empty-state" id="empty-state" hidden>暂无素材组数据</div>
       </main>
     </div>
@@ -395,6 +457,7 @@
 
       const prevBtn = document.querySelector('#prev-btn');
       const nextBtn = document.querySelector('#next-btn');
+      const groupList = document.querySelector('#group-list');
 
       function truncateText(input, maxLength = 20) {
         const text = (input || '').trim();
@@ -402,6 +465,23 @@
           return '';
         }
         return text.length > maxLength ? `${text.slice(0, maxLength)}…` : text;
+      }
+
+      function getRecordFullTitle(record, index) {
+        const titles = Array.isArray(record?.material_titles) ? record.material_titles : [];
+        const primaryTitle = titles.find((item) => item && item.trim());
+        if (primaryTitle) {
+          return primaryTitle.trim();
+        }
+        if (record?.unique_material_id) {
+          return String(record.unique_material_id).trim();
+        }
+        return `素材组 ${index + 1}`;
+      }
+
+      function getRecordLabel(record, index, maxLength = 28) {
+        const full = getRecordFullTitle(record, index);
+        return truncateText(full, maxLength);
       }
 
       async function loadData() {
@@ -645,6 +725,51 @@
         });
       }
 
+      function updateGroupListSelection(currentIndex) {
+        if (!groupList) {
+          return;
+        }
+        groupList.querySelectorAll('.group-item').forEach((button) => {
+          const isActive = Number(button.dataset.index) === currentIndex;
+          button.classList.toggle('is-active', isActive);
+          button.setAttribute('aria-selected', String(isActive));
+        });
+      }
+
+      function renderGroupList(category) {
+        if (!groupList) {
+          return;
+        }
+        groupList.replaceChildren();
+        if (!category || !Array.isArray(category.items) || category.items.length === 0) {
+          const empty = document.createElement('div');
+          empty.className = 'group-list-empty';
+          empty.textContent = '当前类别暂无素材组';
+          groupList.appendChild(empty);
+          return;
+        }
+        const fragment = document.createDocumentFragment();
+        category.items.forEach((record, index) => {
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.className = 'group-item';
+          button.dataset.index = String(index);
+          const fullTitle = getRecordFullTitle(record, index);
+          const label = getRecordLabel(record, index);
+          button.textContent = label;
+          button.title = fullTitle;
+          button.setAttribute('role', 'option');
+          button.addEventListener('click', () => {
+            state.indices.set(category.id, index);
+            showCurrent();
+            button.scrollIntoView({ block: 'nearest' });
+          });
+          fragment.appendChild(button);
+        });
+        groupList.appendChild(fragment);
+        updateGroupListSelection(getCurrentIndex());
+      }
+
       function renderCategoryToggle() {
         const toggle = document.querySelector('#category-toggle');
         toggle.replaceChildren();
@@ -671,6 +796,8 @@
         if (!state.indices.has(categoryId)) {
           state.indices.set(categoryId, 0);
         }
+        const category = getCurrentCategory();
+        renderGroupList(category);
         showCurrent();
       }
 
@@ -727,6 +854,7 @@
         const record = category.items[currentIndex];
         renderMeta(record, category);
         renderImages(record, category.layout);
+        updateGroupListSelection(currentIndex);
         updateIndicator(currentIndex, total, category);
         setNavDisabled(total <= 1);
       }
