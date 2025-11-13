@@ -48,7 +48,7 @@
         color: #555;
       }
 
-      .footer-controls {
+      .header-controls {
         display: flex;
         flex-direction: column;
         gap: 16px;
@@ -361,7 +361,7 @@
           width: auto;
         }
 
-        .footer-controls {
+        .header-controls {
           gap: 12px;
         }
 
@@ -406,6 +406,16 @@
     </style>
   </head>
   <body>
+    <header class="header-controls">
+      <div class="top-bar">
+        <h1>素材组图片预览</h1>
+        <div class="nav">
+          <button id="prev-btn" type="button">上一组</button>
+          <span id="nav-indicator">0 / 0</span>
+          <button id="next-btn" type="button">下一组</button>
+        </div>
+      </div>
+    </header>
     <div class="app-shell">
       <aside class="sidebar">
         <h2 class="sidebar-title">素材类别</h2>
@@ -419,16 +429,6 @@
         <div class="empty-state" id="empty-state" hidden>暂无素材组数据</div>
       </main>
     </div>
-    <footer class="footer-controls">
-      <div class="top-bar">
-        <h1>素材组图片预览</h1>
-        <div class="nav">
-          <button id="prev-btn" type="button">上一组</button>
-          <span id="nav-indicator">0 / 0</span>
-          <button id="next-btn" type="button">下一组</button>
-        </div>
-      </div>
-    </footer>
     <template id="meta-template">
       <div>素材组ID：<strong data-field="unique_material_id"></strong></div>
       <div>报表日期：<strong data-field="report_date"></strong></div>
