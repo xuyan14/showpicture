@@ -146,15 +146,63 @@ def convert_excel_to_json(excel_path, output_path, data_source_name, category_id
         # Excel格式: corrected_url_list, original_url_list
         if pd.notna(row.get('corrected_url_list')):
             try:
-                material_urls = json.loads(str(row['corrected_url_list']))
+                url_str = str(row['corrected_url_list'])
+                # 修复CSV中的中文逗号问题
+                url_str = url_str.replace('，', ',')  # 中文逗号替换为英文逗号
+                material_urls = json.loads(url_str)
             except:
-                material_urls = []
+                # 如果JSON解析失败，尝试使用eval（仅用于CSV格式）
+                try:
+                    url_str = str(row['corrected_url_list']).replace('，', ',')
+                    parsed = eval(url_str)
+                    material_urls = parsed if isinstance(parsed, list) else []
+                except:
+                    material_urls = []
+            
+            # 如果material_urls中的元素是字符串且包含逗号，需要分割
+            if material_urls and isinstance(material_urls, list):
+                expanded_urls = []
+                for url_item in material_urls:
+                    if isinstance(url_item, str):
+                        # 如果字符串包含逗号，按逗号分割
+                        if ',' in url_item:
+                            split_urls = [u.strip() for u in url_item.split(',') if u.strip()]
+                            expanded_urls.extend(split_urls)
+                        else:
+                            expanded_urls.append(url_item)
+                    else:
+                        expanded_urls.append(url_item)
+                material_urls = expanded_urls
         
         if not material_urls and pd.notna(row.get('original_url_list')):
             try:
-                material_urls = json.loads(str(row['original_url_list']))
+                url_str = str(row['original_url_list'])
+                # 修复CSV中的中文逗号问题
+                url_str = url_str.replace('，', ',')  # 中文逗号替换为英文逗号
+                material_urls = json.loads(url_str)
             except:
-                material_urls = []
+                # 如果JSON解析失败，尝试使用eval（仅用于CSV格式）
+                try:
+                    url_str = str(row['original_url_list']).replace('，', ',')
+                    parsed = eval(url_str)
+                    material_urls = parsed if isinstance(parsed, list) else []
+                except:
+                    material_urls = []
+            
+            # 如果material_urls中的元素是字符串且包含逗号，需要分割
+            if material_urls and isinstance(material_urls, list):
+                expanded_urls = []
+                for url_item in material_urls:
+                    if isinstance(url_item, str):
+                        # 如果字符串包含逗号，按逗号分割
+                        if ',' in url_item:
+                            split_urls = [u.strip() for u in url_item.split(',') if u.strip()]
+                            expanded_urls.extend(split_urls)
+                        else:
+                            expanded_urls.append(url_item)
+                    else:
+                        expanded_urls.append(url_item)
+                material_urls = expanded_urls
         
         if not material_urls and pd.notna(row.get('material_url_list')):
             try:
@@ -187,10 +235,25 @@ def convert_excel_to_json(excel_path, output_path, data_source_name, category_id
                 material_urls = expanded_urls
         
         # 按照标题中的数字（+1、+2、+3等）对所有数组进行排序
+        # 只有当标题数量和URL数量匹配时，才进行排序
+        # 如果标题数量少于URL数量，保持原始顺序（避免打乱URL顺序）
         if material_titles and len(material_titles) > 0:
-            material_titles, material_urls, material_ids = sort_by_title_number(
-                material_titles, material_urls, material_ids
-            )
+            if len(material_titles) == len(material_urls):
+                # 标题和URL数量匹配，可以安全排序
+                material_titles, material_urls, material_ids = sort_by_title_number(
+                    material_titles, material_urls, material_ids
+                )
+            elif len(material_titles) < len(material_urls):
+                # 标题数量少于URL数量，只对标题部分排序，保持URL原始顺序
+                # 这种情况通常出现在抖音图文数据中，标题可能只代表其中一个URL
+                # 我们保持URL的原始顺序，只对标题进行排序
+                sorted_titles, _, sorted_ids = sort_by_title_number(
+                    material_titles, 
+                    material_titles[:len(material_urls)] if len(material_titles) <= len(material_urls) else material_titles,
+                    material_ids[:len(material_urls)] if len(material_ids) <= len(material_urls) else material_ids
+                )
+                material_titles = sorted_titles
+                # URLs保持原始顺序，不排序
         
         # 构建记录
         record = {
@@ -374,9 +437,9 @@ if __name__ == "__main__":
     else:
         print(f"文件不存在: {excel_low}")
     
-    # 转换抖音图文消耗最高（支持xlsx和csv格式）
+    # 转换抖音图文消耗最高（支持xlsx和csv格式，包括带(1)的文件名）
     excel_douyin_high = None
-    for filename in ["抖音图文消耗最高.xlsx", "抖音图文消耗最高.csv"]:
+    for filename in ["抖音图文消耗最高.xlsx", "抖音图文消耗最高.csv", "抖音图文消耗最高(1).csv", "抖音图文消耗最高(1).xlsx"]:
         path = base_dir / filename
         if path.exists():
             excel_douyin_high = path
