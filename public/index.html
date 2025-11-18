@@ -477,6 +477,15 @@
       <aside class="sidebar">
         <h2 class="sidebar-title">素材类别</h2>
         <div class="category-toggle" id="category-toggle" role="tablist" aria-label="素材类别切换"></div>
+        <div id="product-filter-container" style="display: none; margin-top: 16px;">
+          <h3 class="sidebar-subtitle">商品数量筛选</h3>
+          <div class="data-source-selector" style="padding: 8px 12px;">
+            <label for="product-count-filter" style="font-size: 0.9rem;">筛选：</label>
+            <select id="product-count-filter" style="min-width: 120px; font-size: 0.9rem;">
+              <option value="all">全部</option>
+            </select>
+          </div>
+        </div>
         <h3 class="sidebar-subtitle">素材组列表</h3>
         <div class="group-list" id="group-list" role="listbox" aria-label="素材组列表"></div>
       </aside>
@@ -517,6 +526,11 @@
       const nextBtn = document.querySelector('#next-btn');
       const groupList = document.querySelector('#group-list');
       const dataSourceSelect = document.querySelector('#data-source-select');
+      const productFilterContainer = document.querySelector('#product-filter-container');
+      const productCountFilter = document.querySelector('#product-count-filter');
+      
+      // 当前筛选的商品数量（null表示全部）
+      let currentProductFilter = null;
 
       function truncateText(input, maxLength = 20) {
         const text = (input || '').trim();
@@ -610,27 +624,41 @@
 
       function getCurrentIndex() {
         const category = getCurrentCategory();
-        if (!category || !Array.isArray(category.items) || category.items.length === 0) {
+        if (!category) {
           return 0;
         }
-        const total = category.items.length;
-        let index = state.indices.get(category.id) ?? 0;
-        if (!Number.isInteger(index)) {
-          index = 0;
+        // 使用筛选后的列表
+        const filteredItems = getFilteredItems(category);
+        if (filteredItems.length === 0) {
+          return 0;
         }
-        index = ((index % total) + total) % total;
-        state.indices.set(category.id, index);
-        return index;
+        const currentOriginalIndex = state.indices.get(category.id) ?? 0;
+        // 找到当前索引在筛选后列表中的位置
+        const filteredIndex = filteredItems.findIndex(item => 
+          category.items.indexOf(item) === currentOriginalIndex
+        );
+        // 如果当前项不在筛选后的列表中，返回0
+        return filteredIndex >= 0 ? filteredIndex : 0;
       }
 
       function setCurrentIndex(nextIndex) {
         const category = getCurrentCategory();
-        if (!category || !Array.isArray(category.items) || category.items.length === 0) {
+        if (!category) {
           return;
         }
-        const total = category.items.length;
+        // 使用筛选后的列表
+        const filteredItems = getFilteredItems(category);
+        if (filteredItems.length === 0) {
+          return;
+        }
+        const total = filteredItems.length;
         const normalized = ((nextIndex % total) + total) % total;
-        state.indices.set(category.id, normalized);
+        // 获取筛选后列表中对应项的原始索引
+        const selectedItem = filteredItems[normalized];
+        const originalIndex = category.items.indexOf(selectedItem);
+        if (originalIndex >= 0) {
+          state.indices.set(category.id, originalIndex);
+        }
       }
 
       function setNavDisabled(disabled) {
@@ -849,31 +877,94 @@
         });
       }
 
+      // 初始化商品数量筛选器
+      function initializeProductFilter(category) {
+        if (!category || category.id !== 'multi') {
+          // 不是多品多图类别，隐藏筛选器
+          productFilterContainer.style.display = 'none';
+          currentProductFilter = null;
+          return;
+        }
+        
+        // 显示筛选器
+        productFilterContainer.style.display = 'block';
+        
+        // 统计商品数量分布
+        const productCountMap = new Map();
+        category.items.forEach((item) => {
+          const productIds = extractProductIds(item);
+          const count = productIds.size;
+          if (count > 0) {
+            productCountMap.set(count, (productCountMap.get(count) || 0) + 1);
+          }
+        });
+        
+        // 清空现有选项（保留"全部"）
+        productCountFilter.innerHTML = '<option value="all">全部</option>';
+        
+        // 按商品数量排序并添加选项
+        const sortedCounts = Array.from(productCountMap.keys()).sort((a, b) => a - b);
+        sortedCounts.forEach((count) => {
+          const option = document.createElement('option');
+          option.value = count;
+          option.textContent = `${count}品 (${productCountMap.get(count)}组)`;
+          productCountFilter.appendChild(option);
+        });
+        
+        // 重置筛选
+        productCountFilter.value = 'all';
+        currentProductFilter = null;
+      }
+      
+      // 获取筛选后的素材组列表
+      function getFilteredItems(category) {
+        if (!category || !Array.isArray(category.items)) {
+          return [];
+        }
+        
+        // 如果不是多品多图类别或没有筛选，返回全部
+        if (category.id !== 'multi' || currentProductFilter === null) {
+          return category.items;
+        }
+        
+        // 根据商品数量筛选
+        return category.items.filter((item) => {
+          const productIds = extractProductIds(item);
+          return productIds.size === currentProductFilter;
+        });
+      }
+      
       function renderGroupList(category) {
+        // 使用筛选后的列表
+        const filteredItems = getFilteredItems(category);
         if (!groupList) {
           return;
         }
         groupList.replaceChildren();
-        if (!category || !Array.isArray(category.items) || category.items.length === 0) {
+        if (!category || filteredItems.length === 0) {
           const empty = document.createElement('div');
           empty.className = 'group-list-empty';
-          empty.textContent = '当前类别暂无素材组';
+          empty.textContent = currentProductFilter !== null 
+            ? `当前筛选条件下暂无素材组` 
+            : '当前类别暂无素材组';
           groupList.appendChild(empty);
           return;
         }
         const fragment = document.createDocumentFragment();
-        category.items.forEach((record, index) => {
+        filteredItems.forEach((record, index) => {
+          // 找到原始索引
+          const originalIndex = category.items.indexOf(record);
           const button = document.createElement('button');
           button.type = 'button';
           button.className = 'group-item';
-          button.dataset.index = String(index);
-          const fullTitle = getRecordFullTitle(record, index);
-          const label = getRecordLabel(record, index);
+          button.dataset.index = String(originalIndex);
+          const fullTitle = getRecordFullTitle(record, originalIndex);
+          const label = getRecordLabel(record, originalIndex);
           button.textContent = label;
           button.title = fullTitle;
           button.setAttribute('role', 'option');
           button.addEventListener('click', () => {
-            state.indices.set(category.id, index);
+            state.indices.set(category.id, originalIndex);
             showCurrent();
             button.scrollIntoView({ block: 'nearest' });
           });
@@ -892,7 +983,11 @@
           button.className = 'category-button';
           button.dataset.categoryId = category.id;
           button.setAttribute('role', 'tab');
-          button.textContent = `${category.name}（${category.items.length}）`;
+          // 显示筛选后的数量（如果是多品多图且正在筛选）
+          const displayCount = (category.id === 'multi' && currentProductFilter !== null)
+            ? getFilteredItems(category).length
+            : category.items.length;
+          button.textContent = `${category.name}（${displayCount}）`;
           button.addEventListener('click', () => {
             switchCategory(category.id);
           });
@@ -910,6 +1005,8 @@
           state.indices.set(categoryId, 0);
         }
         const category = getCurrentCategory();
+        // 初始化商品数量筛选器
+        initializeProductFilter(category);
         renderGroupList(category);
         showCurrent();
       }
@@ -952,19 +1049,23 @@
           return;
         }
 
-        const total = Array.isArray(category.items) ? category.items.length : 0;
+        // 使用筛选后的列表
+        const filteredItems = getFilteredItems(category);
+        const total = filteredItems.length;
         if (total === 0) {
           document.querySelector('#meta').replaceChildren();
           document.querySelector('#preview').replaceChildren();
           empty.hidden = false;
-          empty.textContent = '当前类别暂无素材数据';
+          empty.textContent = currentProductFilter !== null 
+            ? '当前筛选条件下暂无素材数据' 
+            : '当前类别暂无素材数据';
           updateIndicator(0, 0, category);
           setNavDisabled(true);
           return;
         }
 
         const currentIndex = getCurrentIndex();
-        const record = category.items[currentIndex];
+        const record = filteredItems[currentIndex];
         renderMeta(record, category);
         renderImages(record, category.layout);
         updateGroupListSelection(currentIndex);
@@ -991,6 +1092,11 @@
 
           initializeState(categories);
           renderCategoryToggle();
+          const firstCategory = categories[0];
+          if (firstCategory) {
+            // 初始化商品数量筛选器
+            initializeProductFilter(firstCategory);
+          }
           attachNavHandlers();
           switchCategory(state.currentId);
         } catch (error) {
@@ -1025,8 +1131,38 @@
         }
       }
 
+      function attachProductFilterHandler() {
+        if (productCountFilter) {
+          productCountFilter.addEventListener('change', (event) => {
+            const value = event.target.value;
+            if (value === 'all') {
+              currentProductFilter = null;
+            } else {
+              currentProductFilter = parseInt(value, 10);
+            }
+            // 重新渲染列表和类别切换（更新数量）
+            const category = getCurrentCategory();
+            if (category) {
+              renderGroupList(category);
+              renderCategoryToggle();
+              // 如果当前项不在筛选后的列表中，跳转到第一项
+              const filteredItems = getFilteredItems(category);
+              if (filteredItems.length > 0) {
+                const currentOriginalIndex = state.indices.get(category.id) ?? 0;
+                const currentItem = category.items[currentOriginalIndex];
+                if (!filteredItems.includes(currentItem)) {
+                  state.indices.set(category.id, category.items.indexOf(filteredItems[0]));
+                }
+              }
+              showCurrent();
+            }
+          });
+        }
+      }
+
       async function bootstrap() {
         attachDataSourceHandler();
+        attachProductFilterHandler();
         await loadDataSource(state.currentDataSource);
       }
 
