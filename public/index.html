@@ -62,6 +62,44 @@
         gap: 16px;
       }
 
+      .data-source-selector {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 16px;
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.8);
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+      }
+
+      .data-source-selector label {
+        font-size: 0.95rem;
+        font-weight: 500;
+        color: #555;
+      }
+
+      .data-source-selector select {
+        padding: 8px 12px;
+        font-size: 0.95rem;
+        border-radius: 8px;
+        border: 1px solid rgba(0, 0, 0, 0.15);
+        background: #fff;
+        cursor: pointer;
+        transition: border-color 0.15s ease, box-shadow 0.15s ease;
+        min-width: 180px;
+      }
+
+      .data-source-selector select:hover {
+        border-color: #4f8bfd;
+        box-shadow: 0 2px 8px rgba(79, 139, 253, 0.15);
+      }
+
+      .data-source-selector select:focus {
+        outline: none;
+        border-color: #4f8bfd;
+        box-shadow: 0 0 0 3px rgba(79, 139, 253, 0.2);
+      }
+
       h1 {
         margin: 0;
         font-size: 1.8rem;
@@ -370,6 +408,18 @@
           align-items: flex-start;
         }
 
+        .data-source-selector {
+          width: 100%;
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 8px;
+        }
+
+        .data-source-selector select {
+          width: 100%;
+          min-width: auto;
+        }
+
         .nav {
           width: 100%;
           justify-content: space-between;
@@ -415,6 +465,13 @@
           <button id="next-btn" type="button">下一组</button>
         </div>
       </div>
+      <div class="data-source-selector">
+        <label for="data-source-select">数据源：</label>
+        <select id="data-source-select">
+          <option value="data-消耗最高.json">消耗最高</option>
+          <option value="data-消耗最低.json">消耗最低</option>
+        </select>
+      </div>
     </header>
     <div class="app-shell">
       <aside class="sidebar">
@@ -453,11 +510,13 @@
         categoryLookup: new Map(),
         indices: new Map(),
         currentId: '',
+        currentDataSource: 'data-消耗最高.json',
       };
 
       const prevBtn = document.querySelector('#prev-btn');
       const nextBtn = document.querySelector('#next-btn');
       const groupList = document.querySelector('#group-list');
+      const dataSourceSelect = document.querySelector('#data-source-select');
 
       function truncateText(input, maxLength = 20) {
         const text = (input || '').trim();
@@ -484,10 +543,53 @@
         return truncateText(full, maxLength);
       }
 
-      async function loadData() {
-        const response = await fetch('./data.json', { cache: 'no-store' });
+      function extractProductIds(record) {
+        // 从素材组标题中提取商品ID并去重
+        const titles = Array.isArray(record?.material_titles) ? record.material_titles : [];
+        const productIds = new Set();
+        
+        // 匹配模式1：+多品数字+商品ID+ (如：+多品6+6921092748990889928+)
+        // 匹配模式2：+多图数字+品牌+类目+商品ID+ (如：+多图9+唐狮+女装+6921559791397117143+)
+        const pattern1 = /\+多品\d+\+(\d{15,})\+/;
+        const pattern2 = /\+多图\d+\+[^+]+\+[^+]+\+(\d{15,})\+/;
+        
+        titles.forEach((title) => {
+          if (!title || typeof title !== 'string') {
+            return;
+          }
+          // 先尝试模式1
+          let match = title.match(pattern1);
+          if (match && match[1]) {
+            productIds.add(match[1]);
+          } else {
+            // 再尝试模式2
+            match = title.match(pattern2);
+            if (match && match[1]) {
+              productIds.add(match[1]);
+            }
+          }
+        });
+        
+        return productIds;
+      }
+
+      function getProductInfo(record) {
+        // 获取商品ID个数和图片总数
+        const productIds = extractProductIds(record);
+        const productCount = productIds.size;
+        const imageCount = Array.isArray(record?.material_urls) ? record.material_urls.length : 0;
+        
+        if (productCount > 0 && imageCount > 0) {
+          return `${productCount}品${imageCount}图`;
+        }
+        return null;
+      }
+
+      async function loadData(dataSource) {
+        const source = dataSource || state.currentDataSource;
+        const response = await fetch(`./${source}`, { cache: 'no-store' });
         if (!response.ok) {
-          throw new Error('无法加载素材数据');
+          throw new Error(`无法加载素材数据: ${source}`);
         }
         return response.json();
       }
@@ -557,6 +659,17 @@
           if (costValue && costValue.toUpperCase() !== '(NULL)') {
             costContent.textContent = costValue;
             costLabel.textContent = 'cost';
+            
+            // 添加商品ID统计信息
+            const productInfo = getProductInfo(record);
+            if (productInfo) {
+              const productInfoSpan = document.createElement('span');
+              productInfoSpan.textContent = ` · ${productInfo}`;
+              productInfoSpan.style.marginLeft = '8px';
+              productInfoSpan.style.color = '#666';
+              productInfoSpan.style.fontSize = '0.95rem';
+              costWrapper.appendChild(productInfoSpan);
+            }
           } else {
             costWrapper.remove();
           }
@@ -859,9 +972,9 @@
         setNavDisabled(total <= 1);
       }
 
-      async function bootstrap() {
+      async function loadDataSource(dataSource) {
         try {
-          const payload = await loadData();
+          const payload = await loadData(dataSource);
           const categories = Array.isArray(payload?.categories)
             ? payload.categories.filter(
                 (category) => category && Array.isArray(category.items),
@@ -887,6 +1000,34 @@
           empty.hidden = false;
           setNavDisabled(true);
         }
+      }
+
+      function attachDataSourceHandler() {
+        if (dataSourceSelect) {
+          // 设置初始值
+          dataSourceSelect.value = state.currentDataSource;
+          dataSourceSelect.addEventListener('change', async (event) => {
+            const newDataSource = event.target.value;
+            state.currentDataSource = newDataSource;
+            // 重置状态
+            state.categories = [];
+            state.categoryLookup.clear();
+            state.indices.clear();
+            state.currentId = '';
+            // 显示加载状态
+            const empty = document.querySelector('#empty-state');
+            empty.hidden = false;
+            empty.textContent = '正在加载数据...';
+            setNavDisabled(true);
+            // 加载新数据源
+            await loadDataSource(newDataSource);
+          });
+        }
+      }
+
+      async function bootstrap() {
+        attachDataSourceHandler();
+        await loadDataSource(state.currentDataSource);
       }
 
       bootstrap();
